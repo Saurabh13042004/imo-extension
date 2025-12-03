@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "IMO AI Shopping Assistant",
+  "version": "1.0",
+  "description": "Automatically enhances your shopping experience with AI insights.",
+  "permissions": [
+    "activeTab",
+    "scripting"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "src/content.js"
+      ],
+      "css": [
+        "src/styles.css"
+      ]
+    }
+  ],
+  "host_permissions": [
+    "*://*.amazon.com/*",
+    "*://*.walmart.com/*",
+    "*://*.ebay.com/*",
+    "*://*.target.com/*",
+    "*://*.bestbuy.com/*"
+  ],
+  "background": {
+    "service_worker": "src/background.js"
+  },
+  "action": {
+    "default_title": "Analyze with IMO"
+  }
+}
