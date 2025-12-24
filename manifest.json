@@ -22,6 +22,7 @@
   ],
   "host_permissions": [
     "*://*.amazon.com/*",
+    "*://*.amazon.in/*",
     "*://*.walmart.com/*",
     "*://*.ebay.com/*",
     "*://*.target.com/*",

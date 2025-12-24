@@ -4,24 +4,33 @@ console.log("IMO Extension: Content script loaded.");
 
 // Configuration
 const CONFIG = {
-    redirectUrl: "https://informedmarketopinions.com/",
-    loadingDurationMin: 2000, // 2 seconds
-    loadingDurationMax: 5000, // 5 seconds
-    selectors: {
-        productTitle: [
-            "h1",
-            "#productTitle",
-            ".product-title",
-            "[data-testid='product-title']",
-            ".product_title"
-        ]
-    }
+  redirectBaseUrl: "http://localhost:8080/search?q=",
+  loadingDurationMin: 2000, // 2 seconds
+  loadingDurationMax: 5000, // 5 seconds
+  autoActivateDomains: [
+    "amazon.com",
+    "amazon.in",
+    "walmart.com",
+    "ebay.com",
+    "target.com",
+    "bestbuy.com"
+  ],
+  selectors: {
+    productTitle: [
+      "h1",
+      "#productTitle",
+      ".product-title",
+      "[data-testid='product-title']",
+      ".product_title"
+    ]
+  }
 };
 
 // State
 let state = {
-    productName: null,
-    isActive: false
+  productName: null,
+  isActive: false,
+  currentUrl: window.location.href
 };
 
 // Utils
@@ -30,45 +39,84 @@ const getRandomDelay = () => Math.floor(Math.random() * (CONFIG.loadingDurationM
 
 // Core Logic
 function init() {
-    // Simple heuristic to check if we are on a product page
-    // We can refine this by checking for "Add to Cart" buttons or specific URL patterns
-    const productName = extractProductName();
+  checkUrlChange();
 
-    if (productName) {
-        console.log("IMO Extension: Product detected:", productName);
-        state.productName = productName;
-        injectUI();
-    } else {
-        console.log("IMO Extension: No product detected.");
+  // Check for auto-activation
+  const hostname = window.location.hostname;
+  const isAutoActivate = CONFIG.autoActivateDomains.some(domain => hostname.includes(domain));
+
+  if (isAutoActivate) {
+    console.log("IMO Extension: Auto-activation domain detected.");
+    attemptActivation();
+  } else {
+    console.log("IMO Extension: Manual activation required for this domain.");
+  }
+}
+
+function checkUrlChange() {
+  setInterval(() => {
+    if (window.location.href !== state.currentUrl) {
+      console.log("IMO Extension: URL changed, resetting UI.");
+      state.currentUrl = window.location.href;
+      removeUI();
+      // Re-run init to see if we should activate on the new page (for SPA)
+      init();
     }
+  }, 1000);
+}
+
+function attemptActivation() {
+  const productName = extractProductName();
+  if (productName) {
+    console.log("IMO Extension: Product detected:", productName);
+    state.productName = productName;
+    injectUI();
+  } else {
+    // If auto-activating, we might want to be less aggressive if no product is found
+    // But for now, we only inject if we find a product title or if manually triggered
+    console.log("IMO Extension: No product detected.");
+  }
 }
 
 function extractProductName() {
-    for (const selector of CONFIG.selectors.productTitle) {
-        const element = document.querySelector(selector);
-        if (element && element.innerText.trim().length > 0) {
-            return element.innerText.trim();
-        }
+  for (const selector of CONFIG.selectors.productTitle) {
+    const element = document.querySelector(selector);
+    if (element && element.innerText.trim().length > 0) {
+      return element.innerText.trim();
     }
-    return null;
+  }
+  return null;
+}
+
+function scrapePageContent() {
+  // Get visible text from the body, limited to a reasonable amount
+  // We prioritize h1, h2, meta descriptions, etc.
+  const title = document.title;
+  const metaDesc = document.querySelector('meta[name="description"]')?.content || "";
+  const h1s = Array.from(document.querySelectorAll('h1')).map(el => el.innerText).join(" ");
+  const bodyText = document.body.innerText.substring(0, 5000); // Limit to 5000 chars
+
+  return `Title: ${title}\nDescription: ${metaDesc}\nMain Headings: ${h1s}\nContent Snippet: ${bodyText}`;
+}
+
+function removeUI() {
+  const container = document.getElementById('imo-container');
+  if (container) {
+    container.remove();
+  }
 }
 
 function injectUI() {
-    if (document.getElementById('imo-container')) return;
+  if (document.getElementById('imo-container')) return;
 
-    const container = document.createElement('div');
-    container.id = 'imo-container';
+  const container = document.createElement('div');
+  container.id = 'imo-container';
 
-    // Shadow DOM to isolate styles
-    const shadow = container.attachShadow({ mode: 'open' });
+  // Shadow DOM to isolate styles
+  const shadow = container.attachShadow({ mode: 'open' });
 
-    // Import styles (we'll inject the CSS content directly or link it if possible, 
-    // but for Shadow DOM, inline styles or a <style> tag is often easier to ensure isolation)
-    // However, since we added css to manifest, it applies to the main page. 
-    // To apply to Shadow DOM, we need to inject styles inside.
-
-    const style = document.createElement('style');
-    style.textContent = `
+  const style = document.createElement('style');
+  style.textContent = `
     :host {
       all: initial;
       position: fixed;
@@ -171,11 +219,11 @@ function injectUI() {
     }
   `;
 
-    const card = document.createElement('div');
-    card.className = 'imo-card';
+  const card = document.createElement('div');
+  card.className = 'imo-card';
 
-    // Initial Loading HTML
-    card.innerHTML = `
+  // Initial Loading HTML
+  card.innerHTML = `
     <div class="imo-header">IMO AI Assistant</div>
     <div class="imo-content" id="content-area">
       <div class="loader"></div>
@@ -183,55 +231,64 @@ function injectUI() {
     </div>
   `;
 
-    shadow.appendChild(style);
-    shadow.appendChild(card);
-    document.body.appendChild(container);
+  shadow.appendChild(style);
+  shadow.appendChild(card);
+  document.body.appendChild(container);
 
-    // Start the logic flow
-    handleLogic(shadow);
+  // Start the logic flow
+  handleLogic(shadow);
 }
 
 async function handleLogic(shadowRoot) {
-    const contentArea = shadowRoot.getElementById('content-area');
+  const contentArea = shadowRoot.getElementById('content-area');
 
-    // Wait for random delay
-    const delay = getRandomDelay();
-    await sleep(delay);
+  // 1. Scrape content
+  const pageContent = scrapePageContent();
 
-    // Update to Result State
-    contentArea.innerHTML = `
+  // 2. Send to Background for Gemini Analysis
+  try {
+    const response = await chrome.runtime.sendMessage({
+      action: "analyze_content",
+      content: pageContent
+    });
+
+    if (response && response.productName) {
+      state.productName = response.productName;
+    } else {
+      console.warn("IMO Extension: Gemini analysis failed or returned no name. Using fallback.");
+      // Fallback to heuristic
+      if (!state.productName) state.productName = extractProductName() || "Product";
+    }
+  } catch (error) {
+    console.error("IMO Extension: Error communicating with background script:", error);
+    if (!state.productName) state.productName = extractProductName() || "Product";
+  }
+
+  // 3. Update to Result State
+  contentArea.innerHTML = `
     <div class="result-text">Hey, our AI shopping enhancements results are suitable!</div>
     <button class="cta-button" id="redirect-btn">View Results</button>
   `;
 
-    // Add Event Listener
-    const btn = shadowRoot.getElementById('redirect-btn');
-    btn.addEventListener('click', () => {
-        window.location.href = CONFIG.redirectUrl;
-    });
+  // 4. Add Event Listener
+  const btn = shadowRoot.getElementById('redirect-btn');
+  btn.addEventListener('click', () => {
+    const query = encodeURIComponent(state.productName);
+    window.location.href = `${CONFIG.redirectBaseUrl}${query}`;
+  });
 }
 
 // Run init when page loads
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => init());
+  document.addEventListener('DOMContentLoaded', () => init());
 } else {
-    init();
+  init();
 }
 
 // Listen for messages from background script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.action === "activate_imo_ui") {
-        console.log("IMO Extension: Manual activation requested.");
-        // Force injection even if product name wasn't found automatically
-        // Or try to extract again
-        const productName = extractProductName();
-        if (productName) {
-            state.productName = productName;
-            console.log("IMO Extension: Product detected (manual):", productName);
-        } else {
-            console.log("IMO Extension: No product detected (manual), showing generic UI.");
-            state.productName = "Current Page Product";
-        }
-        injectUI();
-    }
+  if (request.action === "activate_imo_ui") {
+    console.log("IMO Extension: Manual activation requested.");
+    attemptActivation();
+  }
 });
