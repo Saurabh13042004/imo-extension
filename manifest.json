@@ -3,6 +3,11 @@
   "name": "IMO AI Shopping Assistant",
   "version": "1.0",
   "description": "Automatically enhances your shopping experience with AI insights.",
+  "icons": {
+    "16": "logo.png",
+    "48": "logo.png",
+    "128": "logo.png"
+  },
   "permissions": [
     "activeTab",
     "scripting"
@@ -32,6 +37,7 @@
     "service_worker": "src/background.js"
   },
   "action": {
-    "default_title": "Analyze with IMO"
+    "default_title": "Analyze with IMO",
+    "default_icon": "logo.png"
   }
 }
