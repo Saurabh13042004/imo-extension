@@ -4,7 +4,7 @@ console.log("IMO Extension: Content script loaded.");
 
 // Configuration
 const CONFIG = {
-  redirectBaseUrl: "http://localhost:8080/search?q=",
+  redirectBaseUrl: "https://informedmarketopinions.com/search?q=",
   loadingDurationMin: 2000, // 2 seconds
   loadingDurationMax: 5000, // 5 seconds
   autoActivateDomains: [
@@ -245,23 +245,33 @@ async function handleLogic(shadowRoot) {
   // 1. Scrape content
   const pageContent = scrapePageContent();
 
-  // 2. Send to Background for Gemini Analysis
+  // 2. Send to Background for Analysis
   try {
     const response = await chrome.runtime.sendMessage({
       action: "analyze_content",
       content: pageContent
     });
 
-    if (response && response.productName) {
-      state.productName = response.productName;
+    if (response && response.redirectUrl) {
+      state.redirectUrl = response.redirectUrl;
     } else {
-      console.warn("IMO Extension: Gemini analysis failed or returned no name. Using fallback.");
-      // Fallback to heuristic
-      if (!state.productName) state.productName = extractProductName() || "Product";
+      console.warn("IMO Extension: Backend analysis failed or returned no URL. Using fallback.");
+      // Fallback: try to extract product name locally and construct URL
+      const fallbackName = extractProductName();
+      if (fallbackName) {
+        state.redirectUrl = `${CONFIG.redirectBaseUrl}${encodeURIComponent(fallbackName)}`;
+      } else {
+        state.redirectUrl = "https://informedmarketopinions.com/"; // Ultimate fallback
+      }
     }
   } catch (error) {
     console.error("IMO Extension: Error communicating with background script:", error);
-    if (!state.productName) state.productName = extractProductName() || "Product";
+    const fallbackName = extractProductName();
+    if (fallbackName) {
+      state.redirectUrl = `${CONFIG.redirectBaseUrl}${encodeURIComponent(fallbackName)}`;
+    } else {
+      state.redirectUrl = "https://informedmarketopinions.com/";
+    }
   }
 
   // 3. Update to Result State
@@ -273,8 +283,9 @@ async function handleLogic(shadowRoot) {
   // 4. Add Event Listener
   const btn = shadowRoot.getElementById('redirect-btn');
   btn.addEventListener('click', () => {
-    const query = encodeURIComponent(state.productName);
-    window.location.href = `${CONFIG.redirectBaseUrl}${query}`;
+    if (state.redirectUrl) {
+      window.location.href = state.redirectUrl;
+    }
   });
 }
 

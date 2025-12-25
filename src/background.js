@@ -3,8 +3,8 @@
 console.log("IMO Extension: Background script loaded.");
 
 // CONFIGURATION
-const GEMINI_API_KEY = "YOUR_GEMINI_API_KEY"; // REPLACE THIS WITH YOUR ACTUAL KEY
-const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+// CONFIGURATION
+const BACKEND_API_URL = "https://informedmarketopinions.com/api/v1/utils/extract-search-query";
 
 // Listen for the extension icon click
 chrome.action.onClicked.addListener((tab) => {
@@ -27,54 +27,36 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         console.log("IMO Extension: Received analysis request.");
 
         // We must return true to indicate we will send a response asynchronously
-        handleAnalysis(request.content).then(sendResponse);
+        handleAnalysis(request.content, sender.tab ? sender.tab.url : null).then(sendResponse);
         return true;
     }
 });
 
-async function handleAnalysis(content) {
-    if (GEMINI_API_KEY === "YOUR_GEMINI_API_KEY") {
-        console.warn("IMO Extension: Gemini API Key is missing.");
-        return { productName: null, error: "API Key missing" };
-    }
-
+async function handleAnalysis(content, url) {
     try {
-        const prompt = `
-        You are an AI shopping assistant. Extract the exact product name from the following web page content.
-        Return ONLY the product name. Do not include "The product name is" or any other text.
-        If you cannot find a product name, return "Unknown Product".
-
-        Page Content:
-        ${content}
-        `;
-
-        const response = await fetch(GEMINI_API_URL, {
+        const response = await fetch(BACKEND_API_URL, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
             },
             body: JSON.stringify({
-                contents: [{
-                    parts: [{
-                        text: prompt
-                    }]
-                }]
+                content: content,
+                url: url
             })
         });
 
         const data = await response.json();
 
-        if (data.candidates && data.candidates[0].content && data.candidates[0].content.parts) {
-            const productName = data.candidates[0].content.parts[0].text.trim();
-            console.log("IMO Extension: Gemini extracted product name:", productName);
-            return { productName: productName };
+        if (data.redirectUrl) {
+            console.log("IMO Extension: Backend returned redirect URL:", data.redirectUrl);
+            return { redirectUrl: data.redirectUrl };
         } else {
-            console.error("IMO Extension: Unexpected Gemini response:", data);
-            return { productName: null };
+            console.error("IMO Extension: Unexpected Backend response:", data);
+            return { redirectUrl: null, error: "Invalid response from backend" };
         }
 
     } catch (error) {
-        console.error("IMO Extension: Error calling Gemini API:", error);
-        return { productName: null, error: error.message };
+        console.error("IMO Extension: Error calling Backend API:", error);
+        return { redirectUrl: null, error: error.message };
     }
 }
