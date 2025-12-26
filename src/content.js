@@ -7,14 +7,7 @@ const CONFIG = {
   redirectBaseUrl: "https://informedmarketopinions.com/search?q=",
   loadingDurationMin: 2000, // 2 seconds
   loadingDurationMax: 5000, // 5 seconds
-  autoActivateDomains: [
-    "amazon.com",
-    "amazon.in",
-    "walmart.com",
-    "ebay.com",
-    "target.com",
-    "bestbuy.com"
-  ],
+
   selectors: {
     productTitle: [
       "h1",
@@ -40,17 +33,7 @@ const getRandomDelay = () => Math.floor(Math.random() * (CONFIG.loadingDurationM
 // Core Logic
 function init() {
   checkUrlChange();
-
-  // Check for auto-activation
-  const hostname = window.location.hostname;
-  const isAutoActivate = CONFIG.autoActivateDomains.some(domain => hostname.includes(domain));
-
-  if (isAutoActivate) {
-    console.log("IMO Extension: Auto-activation domain detected.");
-    attemptActivation();
-  } else {
-    console.log("IMO Extension: Manual activation required for this domain.");
-  }
+  console.log("IMO Extension: Initialized. Waiting for manual activation.");
 }
 
 function checkUrlChange() {
