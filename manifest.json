@@ -15,7 +15,12 @@
   "content_scripts": [
     {
       "matches": [
-        "<all_urls>"
+        "*://*.amazon.com/*",
+        "*://*.amazon.in/*",
+        "*://*.walmart.com/*",
+        "*://*.ebay.com/*",
+        "*://*.target.com/*",
+        "*://*.bestbuy.com/*"
       ],
       "js": [
         "src/content.js"
@@ -24,14 +29,6 @@
         "src/styles.css"
       ]
     }
-  ],
-  "host_permissions": [
-    "*://*.amazon.com/*",
-    "*://*.amazon.in/*",
-    "*://*.walmart.com/*",
-    "*://*.ebay.com/*",
-    "*://*.target.com/*",
-    "*://*.bestbuy.com/*"
   ],
   "background": {
     "service_worker": "src/background.js"

@@ -7,17 +7,30 @@ console.log("IMO Extension: Background script loaded.");
 const BACKEND_API_URL = "https://informedmarketopinions.com/api/v1/utils/extract-search-query";
 
 // Listen for the extension icon click
-chrome.action.onClicked.addListener((tab) => {
+chrome.action.onClicked.addListener(async (tab) => {
     if (tab.id) {
         console.log("IMO Extension: Icon clicked. Sending message to tab", tab.id);
-        chrome.tabs.sendMessage(tab.id, { action: "activate_imo_ui" }).catch((error) => {
-            console.warn("IMO Extension: Could not send message to tab. Content script might not be loaded.", error);
-            // Optional: Inject script if not loaded (requires 'scripting' permission)
-            chrome.scripting.executeScript({
-                target: { tabId: tab.id },
-                files: ["src/content.js"]
-            });
-        });
+        try {
+            await chrome.tabs.sendMessage(tab.id, { action: "activate_imo_ui" });
+        } catch (error) {
+            console.warn("IMO Extension: Content script not ready. Injecting scripts...", error);
+            try {
+                await chrome.scripting.insertCSS({
+                    target: { tabId: tab.id },
+                    files: ["src/styles.css"]
+                });
+                await chrome.scripting.executeScript({
+                    target: { tabId: tab.id },
+                    files: ["src/content.js"]
+                });
+
+                // Retry sending the message after injection
+                await chrome.tabs.sendMessage(tab.id, { action: "activate_imo_ui" });
+
+            } catch (injectionError) {
+                console.error("IMO Extension: Script injection failed.", injectionError);
+            }
+        }
     }
 });
 
