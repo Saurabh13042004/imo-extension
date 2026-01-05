@@ -3,36 +3,10 @@
 console.log("IMO Extension: Background script loaded.");
 
 // CONFIGURATION
-// CONFIGURATION
-const BACKEND_API_URL = "https://informedmarketopinions.com/api/v1/utils/extract-search-query";
+const BACKEND_API_URL = "https://informedmarketopinions.com/api/api/v1/utils/extract-search-query";
 
-// Listen for the extension icon click
-chrome.action.onClicked.addListener(async (tab) => {
-    if (tab.id) {
-        console.log("IMO Extension: Icon clicked. Sending message to tab", tab.id);
-        try {
-            await chrome.tabs.sendMessage(tab.id, { action: "activate_imo_ui" });
-        } catch (error) {
-            console.warn("IMO Extension: Content script not ready. Injecting scripts...", error);
-            try {
-                await chrome.scripting.insertCSS({
-                    target: { tabId: tab.id },
-                    files: ["src/styles.css"]
-                });
-                await chrome.scripting.executeScript({
-                    target: { tabId: tab.id },
-                    files: ["src/content.js"]
-                });
-
-                // Retry sending the message after injection
-                await chrome.tabs.sendMessage(tab.id, { action: "activate_imo_ui" });
-
-            } catch (injectionError) {
-                console.error("IMO Extension: Script injection failed.", injectionError);
-            }
-        }
-    }
-});
+// Add logging to verify the URL being called
+console.log("IMO Extension: API URL configured as:", BACKEND_API_URL);
 
 // Listen for messages from content script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -47,6 +21,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 async function handleAnalysis(content, url) {
     try {
+        console.log("IMO Extension: Calling API with URL:", BACKEND_API_URL);
         const response = await fetch(BACKEND_API_URL, {
             method: "POST",
             headers: {
@@ -58,7 +33,16 @@ async function handleAnalysis(content, url) {
             })
         });
 
+        console.log("IMO Extension: Response status:", response.status, response.statusText);
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error("IMO Extension: HTTP Error:", response.status, errorText);
+            return { redirectUrl: null, error: `HTTP ${response.status}` };
+        }
+
         const data = await response.json();
+        console.log("IMO Extension: Backend response data:", data);
 
         if (data.redirectUrl) {
             console.log("IMO Extension: Backend returned redirect URL:", data.redirectUrl);

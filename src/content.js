@@ -196,6 +196,33 @@ function injectUI() {
     .cta-button:active {
       transform: translateY(0);
     }
+
+    .close-btn {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: none;
+      border: none;
+      font-size: 24px;
+      color: #666;
+      cursor: pointer;
+      padding: 0;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: color 0.2s ease;
+    }
+
+    .close-btn:hover {
+      color: #000;
+    }
+    
+    .card-header-container {
+      position: relative;
+      width: 100%;
+    }
     
     .hidden {
       display: none;
@@ -204,9 +231,11 @@ function injectUI() {
 
   const card = document.createElement('div');
   card.className = 'imo-card';
+  card.style.position = 'relative';
 
   // Initial Loading HTML
   card.innerHTML = `
+    <button class="close-btn" id="close-btn">✕</button>
     <div class="imo-header">IMO AI Assistant</div>
     <div class="imo-content" id="content-area">
       <div class="loader"></div>
@@ -217,6 +246,14 @@ function injectUI() {
   shadow.appendChild(style);
   shadow.appendChild(card);
   document.body.appendChild(container);
+
+  // Add close button listener
+  const closeBtn = shadow.getElementById('close-btn');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', () => {
+      removeUI();
+    });
+  }
 
   // Start the logic flow
   handleLogic(shadow);
@@ -263,13 +300,21 @@ async function handleLogic(shadowRoot) {
     <button class="cta-button" id="redirect-btn">View Results</button>
   `;
 
-  // 4. Add Event Listener
+  // 4. Add Event Listener for redirect button
   const btn = shadowRoot.getElementById('redirect-btn');
   btn.addEventListener('click', () => {
     if (state.redirectUrl) {
       window.location.href = state.redirectUrl;
     }
   });
+
+  // 5. Re-attach close button listener if needed
+  const closeBtn = shadowRoot.getElementById('close-btn');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', () => {
+      removeUI();
+    });
+  }
 }
 
 // Run init when page loads
